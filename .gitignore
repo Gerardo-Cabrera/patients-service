@@ -1,0 +1,12 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+patients.db
+patients-api.db
+/dist
+/build
+src/__pycache__
+tests/__pycache__

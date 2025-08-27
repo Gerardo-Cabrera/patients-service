@@ -329,3 +329,11 @@ patients-service/
 ├── pytest.ini         # Configuración pytest
 └── README.md          # Documentación
 ```
+
+## Demo
+
+Puede probar la API en [https://patients-service.onrender.com/docs](https://patients-service.onrender.com/docs).
+
+## Autor
+
+Desarrollador por [Neo-Gerardo]

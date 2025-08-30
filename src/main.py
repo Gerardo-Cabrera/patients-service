@@ -6,7 +6,8 @@ from typing import Optional
 from sqlmodel import Session
 from contextlib import asynccontextmanager
 
-from .database import init_db, get_session, engine
+import logging
+from .database import init_db, get_session, engine, check_db_connection
 from .models import Patient, PatientCreate, PatientUpdate, User, UserCreate
 from .crud import create_user, get_user_by_username, create_patient, \
     get_patient, list_patients, update_patient, delete_patient
@@ -17,18 +18,56 @@ from .settings import get_settings
 
 # Obtener configuración
 settings = get_settings()
+DATABASE_URL = settings.database_url
 
 # Crear routers para organizar endpoints
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 patients_router = APIRouter(prefix="/patients", tags=["Patients"])
 health_router = APIRouter(tags=["Health"])
 
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+logger = logging.getLogger("uvicorn")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+
+    try:
+        logger.info("LIFESPAN startup - DATABASE_URL=%s", DATABASE_URL)
+
+        if not check_db_connection():
+            message = "DB inicializada pero no accesible"
+            logger.error(message)
+            raise RuntimeError(message)
+
+        yield
+    except Exception:
+        message = "Fallo en el initialization flow durante lifespan startup"
+        logger.exception(message)
+        raise
+    finally:
+        # Shutdown: dispose engine
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+
+# Crear la aplicación FastAPI
 app = FastAPI(
     title="Patients API",
     version="1.0",
     description="API para gestión de pacientes",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configuración de CORS
@@ -40,27 +79,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Middleware de seguridad (solo en producción)
 if settings.environment == "production":
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=["localhost", "127.0.0.1", "0.0.0.0"]
     )
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    init_db()
-
-    try:
-        yield
-    finally:
-        # Shutdown: dispose engine
-        try:
-            engine.dispose()
-        except Exception:
-            pass
 
 
 # Auth endpoints
